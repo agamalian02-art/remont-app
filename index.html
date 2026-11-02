@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Расчёт ремонта</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* Мини-приложение: берёт цвета из темы Telegram, вне Telegram — свои. */
+:root {
+  --bg: var(--tg-theme-bg-color, #f4f2ef);
+  --card: var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color, #ffffff));
+  --text: var(--tg-theme-text-color, #1d1f24);
+  --hint: var(--tg-theme-hint-color, #7d7a74);
+  --accent: var(--tg-theme-button-color, #d4782a);
+  --accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --line: color-mix(in srgb, var(--hint) 25%, transparent);
+  --soft: color-mix(in srgb, var(--accent) 12%, var(--card));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.tg) { --bg: #16171a; --card: #202227; --text: #f1efeb; --hint: #9b978f; --accent: #e8913f; --accent-text: #16171a; }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.app { max-width: 560px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) 120px max(16px, env(safe-area-inset-left)); display: grid; gap: 14px; }
+.head { display: flex; align-items: center; gap: 12px; }
+.logo { width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; font-weight: 800; font-size: 20px; flex: none; }
+.head h1 { font-size: 19px; margin: 0; line-height: 1.2; }
+.head p { margin: 0; color: var(--hint); font-size: 13px; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--card); border-radius: 12px; padding: 4px; gap: 4px; }
+.tab { border: 0; background: transparent; color: var(--hint); font: 600 14px inherit; font-family: inherit; padding: 9px 4px; border-radius: 9px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--soft); color: var(--text); }
+.card { background: var(--card); border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
+.q { font-weight: 700; font-size: 15px; }
+.opts { display: grid; gap: 8px; }
+.opt { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; border: 1.5px solid var(--line); background: transparent; color: var(--text); border-radius: 12px; padding: 12px 14px; font: inherit; cursor: pointer; }
+.opt small { color: var(--hint); white-space: nowrap; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--soft); }
+.area-row { display: flex; align-items: baseline; justify-content: space-between; }
+.area-val { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.area-val span { font-size: 15px; color: var(--hint); font-weight: 600; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; padding: 6px 12px; font: 600 13px inherit; font-family: inherit; cursor: pointer; }
+.total { position: sticky; top: 8px; z-index: 5; background: var(--accent); color: var(--accent-text); border-radius: 16px; padding: 14px 16px; display: grid; gap: 2px; }
+.total small { opacity: .85; font-size: 12px; }
+.total b { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.note { color: var(--hint); font-size: 13px; }
+.works { display: grid; gap: 12px; }
+.work { background: var(--card); border-radius: 16px; overflow: hidden; }
+.work-img { height: 120px; display: flex; align-items: flex-end; padding: 10px 12px; color: #fff; font-weight: 700; font-size: 13px; }
+.work-body { padding: 12px 14px; display: grid; gap: 4px; }
+.work-body b { font-size: 15px; }
+.work-meta { display: flex; gap: 14px; color: var(--hint); font-size: 13px; flex-wrap: wrap; }
+.demo-tag { font-size: 12px; color: var(--hint); text-align: center; }
+.field { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
+.field input, .field select { font: 16px inherit; font-family: inherit; color: var(--text); background: var(--bg); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; width: 100%; }
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+.consent { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--hint); }
+.consent input { margin-top: 2px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+.summary { background: var(--soft); border-radius: 12px; padding: 12px 14px; font-size: 14px; display: grid; gap: 2px; }
+.error { color: #d6453d; font-size: 13px; }
+.fallback-btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom)); width: min(528px, calc(100% - 32px)); border: 0; border-radius: 14px; padding: 16px; background: var(--accent); color: var(--accent-text); font: 700 16px inherit; font-family: inherit; cursor: pointer; box-shadow: 0 10px 30px -10px rgba(0,0,0,.35); }
+.done { text-align: center; padding: 40px 16px; display: grid; gap: 10px; }
+.done .big { font-size: 48px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="head">
+    <div class="logo" id="logo">К</div>
+    <div><h1 id="title">Ремонт квартир</h1><p>Расчёт за минуту · замер бесплатно</p></div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="calc" aria-selected="true">🧮 Расчёт</button>
+    <button class="tab" role="tab" data-tab="works" aria-selected="false">🏠 Работы</button>
+    <button class="tab" role="tab" data-tab="lead" aria-selected="false">📏 Замер</button>
+  </div>
+
+  <section id="tab-calc" class="app" style="padding:0">
+    <div class="total" aria-live="polite">
+      <small>Примерная стоимость работ</small>
+      <b id="total">—</b>
+    </div>
+    <div id="steps" class="app" style="padding:0"></div>
+    <p class="note" id="note"></p>
+  </section>
+
+  <section id="tab-works" hidden>
+    <div class="works" id="works"></div>
+    <p class="demo-tag">Демо: на настоящем приложении — фото объектов компании</p>
+  </section>
+
+  <section id="tab-lead" hidden>
+    <div class="card">
+      <div class="q">Бесплатный замер</div>
+      <div class="summary" id="lead-summary"></div>
+      <label class="field">Имя<input id="f-name" autocomplete="given-name" placeholder="Как к вам обращаться"></label>
+      <label class="field">Телефон<input id="f-phone" type="tel" autocomplete="tel" placeholder="+7 900 000-00-00"></label>
+      <label class="field">Когда удобно
+        <select id="f-when">
+          <option>В ближайшие дни</option>
+          <option>На этой неделе, будни</option>
+          <option>В выходные</option>
+          <option>Позвоните, договоримся</option>
+        </select>
+      </label>
+      <label class="consent"><input type="checkbox" id="f-consent"> Согласен(на) на обработку имени и телефона, чтобы со мной связались по замеру</label>
+      <div class="error" id="f-error" hidden></div>
+    </div>
+  </section>
+
+  <section id="tab-done" hidden>
+    <div class="done card">
+      <div class="big">✅</div>
+      <b>Заявка отправлена</b>
+      <p class="note">Инженер позвонит и договорится о времени замера.</p>
+    </div>
+  </section>
+</div>
+<button class="fallback-btn" id="fallback-btn" type="button" hidden></button>
+
+<script>
+// Конфиг калькулятора приходит от бота в адресе (#c=...), он собран из базы знаний.
+// Без него — встроенный демо-пример, чтобы страницу можно было открыть и в браузере.
+const DEMO = {
+  t: "Ремонт квартир «Квадрат»",
+  s: [
+    { q: "Какой ремонт нужен?", o: [["Косметический", "rate", 5500], ["Капитальный", "rate", 11000], ["Под ключ с дизайн-проектом", "rate", 17000]] },
+    { q: "Какое жильё?", o: [["Новостройка", "mult", 1], ["Вторичка", "mult", 1.15]] },
+    { q: "Площадь квартиры, м²", a: 1, p: [30, 45, 60, 80] },
+    { q: "Материалы: кто закупает черновые?", o: [["Мы, со скидкой поставщика", "mult", 1.35], ["Вы сами", "mult", 1]] }
+  ],
+  d: 0.15,
+  n: "Это ориентир по работам. Точную смету инженер составит после бесплатного замера, цена в договоре фиксируется."
+};
+
+function readConfig() {
+  const m = location.hash.match(/c=([A-Za-z0-9_-]+)/);
+  if (!m) return DEMO;
+  try {
+    const b64 = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (e) { return DEMO; }
+}
+
+const cfg = readConfig();
+const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData !== undefined ? window.Telegram.WebApp : null;
+const inTelegram = !!(tg && tg.platform && tg.platform !== "unknown");
+if (inTelegram) { document.documentElement.classList.add("tg"); tg.ready(); tg.expand(); }
+
+const answers = cfg.s.map(step => step.a ? (step.p && step.p[1]) || 45 : 0);
+const $ = id => document.getElementById(id);
+const money = n => n.toLocaleString("ru-RU").replace(/\s/g, " ") + " ₽";
+const round = n => Math.round(n / 1000) * 1000;
+const haptic = () => { if (inTelegram && tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); };
+
+$("title").textContent = cfg.t;
+$("logo").textContent = (cfg.t.match(/«(.)/) || [, cfg.t[0]])[1];
+$("note").textContent = cfg.n || "";
+document.title = cfg.t;
+
+// Та же формула, что в calc.py: площадь × цена за м² × множители + надбавки.
+function estimate() {
+  let area = 0, rate = 0, mult = 1, add = 0;
+  cfg.s.forEach((step, i) => {
+    if (step.a) { area = answers[i]; return; }
+    const [, kind, value] = step.o[answers[i]];
+    if (kind === "rate") rate += value; else if (kind === "mult") mult *= value; else add += value;
+  });
+  const total = area * rate * mult + add;
+  return { low: round(total * (1 - cfg.d)), high: round(total * (1 + cfg.d)) };
+}
+
+function shortQ(q) {
+  const s = q.replace(/\?$/, "").replace(/^(какой|какое|какая|какие|кто)\s+/i, "");
+  return s.split(/[,:]/)[0].split(" ")[0].replace(/^./, c => c.toUpperCase());
+}
+
+function summaryLines() {
+  return cfg.s.map((step, i) => step.a
+    ? `Площадь: ${answers[i]} м²`
+    : `${shortQ(step.q)}: ${step.o[answers[i]][0]}`);
+}
+
+function renderSteps() {
+  const box = $("steps");
+  box.innerHTML = "";
+  cfg.s.forEach((step, i) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const q = document.createElement("div");
+    q.className = "q"; q.textContent = step.q;
+    card.append(q);
+    if (step.a) {
+      const row = document.createElement("div");
+      row.className = "area-row";
+      row.innerHTML = `<div class="area-val"><output id="area-out"></output> <span>м²</span></div>`;
+      const range = document.createElement("input");
+      range.type = "range"; range.min = 15; range.max = 200; range.step = 1; range.value = answers[i];
+      range.setAttribute("aria-label", step.q);
+      range.addEventListener("input", () => { answers[i] = +range.value; update(); });
+      range.addEventListener("change", haptic);
+      const presets = document.createElement("div");
+      presets.className = "presets";
+      (step.p || []).forEach(v => {
+        const c = document.createElement("button");
+        c.type = "button"; c.className = "chip"; c.textContent = `${v} м²`;
+        c.addEventListener("click", () => { answers[i] = v; range.value = v; haptic(); update(); });
+        presets.append(c);
+      });
+      card.append(row, range, presets);
+    } else {
+      const opts = document.createElement("div");
+      opts.className = "opts";
+      step.o.forEach(([label, kind, value], j) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "opt";
+        const hint = kind === "rate" ? `${money(value)}/м²` : kind === "add" ? `+${money(value)}` : value > 1 ? `+${Math.round((value - 1) * 100)}%` : "";
+        b.innerHTML = `<span></span><small>${hint}</small>`;
+        b.firstChild.textContent = label;
+        b.addEventListener("click", () => { answers[i] = j; haptic(); update(); });
+        opts.append(b);
+      });
+      card.append(opts);
+    }
+    box.append(card);
+  });
+}
+
+let tab = "calc";
+function update() {
+  const est = estimate();
+  $("total").textContent = `от ${money(est.low)} до ${money(est.high)}`;
+  document.querySelectorAll("#steps .card").forEach((card, i) => {
+    card.querySelectorAll(".opt").forEach((b, j) => b.setAttribute("aria-pressed", answers[i] === j));
+  });
+  const out = $("area-out"); if (out) out.textContent = answers[cfg.s.findIndex(s => s.a)];
+  $("lead-summary").innerHTML = summaryLines().map(l => `<div></div>`).join("") + `<b></b>`;
+  const rows = $("lead-summary").children;
+  summaryLines().forEach((l, k) => { rows[k].textContent = l; });
+  rows[rows.length - 1].textContent = `≈ ${money(est.low)} – ${money(est.high)}`;
+  updateMainButton();
+}
+
+function setTab(name) {
+  tab = name;
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === name));
+  ["calc", "works", "lead", "done"].forEach(n => { $("tab-" + n).hidden = n !== name; });
+  if (inTelegram) {
+    if (name === "calc" || name === "done") tg.BackButton.hide(); else tg.BackButton.show();
+  }
+  window.scrollTo(0, 0);
+  updateMainButton();
+}
+
+function mainAction() { return tab === "lead" ? "Отправить заявку на замер" : "Вызвать замерщика бесплатно"; }
+
+function updateMainButton() {
+  const text = mainAction();
+  if (inTelegram) {
+    if (tab === "done") { tg.MainButton.hide(); return; }
+    tg.MainButton.setParams({ text, is_visible: true });
+  } else {
+    $("fallback-btn").hidden = tab === "done";
+    $("fallback-btn").textContent = text;
+  }
+}
+
+function onMain() {
+  if (tab !== "lead") { setTab("lead"); return; }
+  const name = $("f-name").value.trim();
+  const phone = $("f-phone").value.trim();
+  const err = $("f-error");
+  if (!name || phone.replace(/\D/g, "").length < 10) { err.hidden = false; err.textContent = "Укажите имя и телефон — инженер позвонит, чтобы договориться о замере."; return; }
+  if (!$("f-consent").checked) { err.hidden = false; err.textContent = "Отметьте согласие на обработку данных — без него мы не можем принять заявку."; return; }
+  err.hidden = true;
+  // Бот пересчитывает цену сам по ответам — подделать сумму из приложения нельзя.
+  const data = JSON.stringify({ v: 1, a: answers, name, phone, when: $("f-when").value });
+  if (inTelegram) { tg.sendData(data); return; } // приложение закроется, заявку обработает бот
+  console.log("Заявка (вне Telegram не отправляется):", data);
+  setTab("done");
+}
+
+const WORKS = [
+  ["Новостройка, ФМР", "Капитальный ремонт", "54 м²", "3 месяца", "≈ 710 000 ₽", "linear-gradient(135deg,#6b5b4b,#c9a27a)"],
+  ["Новостройка, ЮМР", "Косметический ремонт", "38 м²", "4 недели", "≈ 215 000 ₽", "linear-gradient(135deg,#40566b,#9fb8c9)"],
+  ["Вторичка, Центр", "Под ключ с дизайн-проектом", "72 м²", "5 месяцев", "≈ 1 400 000 ₽", "linear-gradient(135deg,#3b3b3b,#b3925d)"]
+];
+$("works").innerHTML = WORKS.map(() => `<div class="work"><div class="work-img"></div><div class="work-body"><b></b><div class="work-meta"></div></div></div>`).join("");
+[...$("works").children].forEach((el, i) => {
+  const [place, kind, area, term, price, bg] = WORKS[i];
+  el.querySelector(".work-img").style.background = bg;
+  el.querySelector(".work-img").textContent = place;
+  el.querySelector("b").textContent = kind;
+  el.querySelector(".work-meta").textContent = `${area} · ${term} · ${price}`;
+});
+
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => setTab(t.dataset.tab)));
+$("fallback-btn").addEventListener("click", onMain);
+if (inTelegram) {
+  tg.MainButton.onClick(onMain);
+  tg.BackButton.onClick(() => setTab("calc"));
+}
+renderSteps();
+update();
+setTab("calc");
+</script>
+</body>
+</html>
