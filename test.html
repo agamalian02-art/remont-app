@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тест уровня английского</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* Мини-приложение: тест уровня. Цвета из темы Telegram, вне Telegram — свои. */
+:root {
+  --bg: var(--tg-theme-bg-color, #f2f4f8);
+  --card: var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color, #ffffff));
+  --text: var(--tg-theme-text-color, #1a1d26);
+  --hint: var(--tg-theme-hint-color, #737a8c);
+  --accent: var(--tg-theme-button-color, #2f5bd3);
+  --accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --line: color-mix(in srgb, var(--hint) 25%, transparent);
+  --soft: color-mix(in srgb, var(--accent) 12%, var(--card));
+  --ok: #2e9e5b;
+  --bad: #d6453d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.tg) { --bg: #14161c; --card: #1e212a; --text: #eef0f5; --hint: #949bad; --accent: #6b8cff; --accent-text: #0f1220; }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.app { max-width: 560px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) 120px max(16px, env(safe-area-inset-left)); display: grid; gap: 14px; }
+.head { display: flex; align-items: center; gap: 12px; }
+.logo { width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; font-weight: 800; font-size: 20px; flex: none; }
+.head h1 { font-size: 19px; margin: 0; line-height: 1.2; }
+.head p { margin: 0; color: var(--hint); font-size: 13px; }
+.card { background: var(--card); border-radius: 16px; padding: 18px 16px; display: grid; gap: 12px; }
+.big-title { font-size: 22px; font-weight: 800; line-height: 1.25; margin: 0; }
+.muted { color: var(--hint); font-size: 14px; margin: 0; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fact { background: var(--soft); border-radius: 12px; padding: 10px; text-align: center; }
+.fact b { display: block; font-size: 18px; }
+.fact span { font-size: 12px; color: var(--hint); }
+.levels { display: flex; gap: 6px; flex-wrap: wrap; }
+.lvl { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--soft); }
+.progress { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.progress div { height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+.qnum { font-size: 13px; color: var(--hint); display: flex; justify-content: space-between; }
+.question { font-size: 20px; font-weight: 700; line-height: 1.35; }
+.question .gap { display: inline-block; min-width: 56px; border-bottom: 2px solid var(--accent); margin: 0 2px; }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: left; border: 1.5px solid var(--line); background: transparent; color: var(--text); border-radius: 12px; padding: 14px; font: 16px inherit; font-family: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+.opt:hover { border-color: var(--accent); }
+.opt.picked { border-color: var(--accent); background: var(--soft); }
+.skip { justify-self: center; border: 0; background: transparent; color: var(--hint); font: 14px inherit; font-family: inherit; cursor: pointer; padding: 6px; }
+.badge { justify-self: start; font-size: 40px; font-weight: 900; color: var(--accent); line-height: 1; }
+.score { font-size: 14px; color: var(--hint); }
+.advice { background: var(--soft); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; }
+.advice small { color: var(--hint); font-size: 12px; }
+.scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.scale div { text-align: center; font-size: 12px; font-weight: 700; padding: 6px 0; border-radius: 8px; background: var(--line); color: var(--hint); }
+.scale div.on { background: var(--accent); color: var(--accent-text); }
+.review { display: grid; gap: 6px; font-size: 14px; }
+.review div { display: flex; gap: 8px; }
+.review .r-ok { color: var(--ok); font-weight: 700; }
+.review .r-bad { color: var(--bad); font-weight: 700; }
+.field { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
+.field input, .field select { font: 16px inherit; font-family: inherit; color: var(--text); background: var(--bg); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; width: 100%; }
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+.consent { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--hint); }
+.consent input { margin-top: 2px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+.error { color: var(--bad); font-size: 13px; }
+.fallback-btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom)); width: min(528px, calc(100% - 32px)); border: 0; border-radius: 14px; padding: 16px; background: var(--accent); color: var(--accent-text); font: 700 16px inherit; font-family: inherit; cursor: pointer; box-shadow: 0 10px 30px -10px rgba(0,0,0,.35); }
+.done { text-align: center; padding: 40px 16px; }
+.done .big { font-size: 48px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="head">
+    <div class="logo" id="logo">М</div>
+    <div><h1 id="title">Школа английского</h1><p>Тест уровня · пробный урок бесплатно</p></div>
+  </div>
+
+  <section id="s-intro" class="card">
+    <h2 class="big-title">Узнайте свой уровень английского за 3 минуты</h2>
+    <p class="muted">Вопросы от простых к сложным. Не знаете ответ — жмите «Не знаю», так результат будет точнее.</p>
+    <div class="facts">
+      <div class="fact"><b id="q-count">15</b><span>вопросов</span></div>
+      <div class="fact"><b>3</b><span>минуты</span></div>
+      <div class="fact"><b>A1–C1</b><span>шкала</span></div>
+    </div>
+    <div class="levels" id="levels"></div>
+  </section>
+
+  <section id="s-quiz" class="card" hidden>
+    <div class="qnum"><span id="q-num"></span><span id="q-level"></span></div>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="question" id="question"></div>
+    <div class="opts" id="opts"></div>
+    <button class="skip" id="skip" type="button">Не знаю →</button>
+  </section>
+
+  <section id="s-result" hidden>
+    <div class="card">
+      <p class="muted">Ваш уровень</p>
+      <div class="badge" id="r-level"></div>
+      <div class="score" id="r-score"></div>
+      <div class="scale" id="r-scale"></div>
+      <div class="advice"><small>Подходящий курс</small><b id="r-advice"></b></div>
+      <p class="muted">Точнее уровень определит преподаватель на бесплатном пробном уроке — 45 минут.</p>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <b>Ваши ответы</b>
+      <div class="review" id="review"></div>
+    </div>
+  </section>
+
+  <section id="s-form" class="card" hidden>
+    <b>Бесплатный пробный урок</b>
+    <div class="advice"><small>Результат теста</small><b id="f-result"></b></div>
+    <label class="field">Имя<input id="f-name" autocomplete="given-name" placeholder="Как к вам обращаться"></label>
+    <label class="field">Телефон<input id="f-phone" type="tel" autocomplete="tel" placeholder="+7 900 000-00-00"></label>
+    <label class="field">Для кого
+      <select id="f-who"><option>Для себя</option><option>Для ребёнка</option></select>
+    </label>
+    <label class="field">Формат
+      <select id="f-format"><option>Очно в классе</option><option>Онлайн</option><option>Пока не знаю</option></select>
+    </label>
+    <label class="field">Когда удобно
+      <select id="f-when"><option>Утром</option><option>Днём</option><option selected>Вечером</option><option>В выходные</option></select>
+    </label>
+    <label class="consent"><input type="checkbox" id="f-consent"> Согласен(на) на обработку имени и телефона, чтобы со мной связались по пробному уроку</label>
+    <div class="error" id="f-error" hidden></div>
+  </section>
+
+  <section id="s-done" class="card done" hidden>
+    <div class="big">✅</div>
+    <b>Заявка отправлена</b>
+    <p class="muted">Администратор позвонит и подберёт время пробного урока.</p>
+  </section>
+</div>
+<button class="fallback-btn" id="fallback-btn" type="button" hidden></button>
+
+<script>
+// Вопросы приходят от бота в адресе (#c=...), они собраны из базы знаний школы.
+// Без них — встроенный демо-тест, чтобы страницу можно было открыть в браузере.
+const DEMO = {
+  k: "test", t: "Школа английского «Мост»",
+  q: [
+    ["She ___ a teacher.", ["are", "is", "am", "be"], 1],
+    ["I ___ two brothers.", ["has", "having", "have", "am have"], 2],
+    ["___ you like coffee?", ["Do", "Does", "Are", "Is"], 0],
+    ["Yesterday we ___ to the cinema.", ["go", "gone", "goes", "went"], 3],
+    ["This book is ___ than that one.", ["interestinger", "more interesting", "most interesting", "interesting"], 1],
+    ["There isn't ___ milk in the fridge.", ["some", "many", "any", "a"], 2],
+    ["I ___ here since 2020.", ["live", "am living", "have lived", "lived"], 2],
+    ["If it rains tomorrow, we ___ at home.", ["will stay", "stay", "would stay", "stayed"], 0],
+    ["The film was so ___ that I fell asleep.", ["bored", "boring", "bore", "boredom"], 1],
+    ["By the time we arrived, the train ___.", ["has left", "left", "had left", "was leaving"], 2],
+    ["I wish I ___ more time to travel.", ["have", "will have", "would have", "had"], 3],
+    ["She is used to ___ early.", ["getting up", "get up", "got up", "have got up"], 0],
+    ["Hardly ___ the room when the phone rang.", ["I had entered", "had I entered", "did I enter", "I entered"], 1],
+    ["The project, ___ was launched last year, is already profitable.", ["that", "what", "which", "who"], 2],
+    ["He ___ have taken the keys — they're not here.", ["should", "must", "can", "ought"], 1]
+  ],
+  b: [
+    [0, 3, "A1 Beginner", "Курс «Старт» с нуля: группа 2 раза в неделю, 6 400 ₽/мес"],
+    [4, 6, "A2 Elementary", "Курс «Elementary»: группа 2 раза в неделю, 6 400 ₽/мес"],
+    [7, 9, "B1 Intermediate", "Разговорный курс «Intermediate»: группа 6 400 ₽/мес или мини-группа 8 800 ₽/мес"],
+    [10, 12, "B2 Upper-Intermediate", "Мини-группа «Upper-Intermediate» с носителем: 8 800 ₽/мес"],
+    [13, 15, "C1 Advanced", "Индивидуальные занятия под вашу цель: 1 500 ₽ за занятие"]
+  ]
+};
+const SKIPPED = -1;
+
+function readConfig() {
+  const m = location.hash.match(/c=([A-Za-z0-9_-]+)/);
+  if (!m) return DEMO;
+  try {
+    const bytes = Uint8Array.from(atob(m[1].replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0));
+    const cfg = JSON.parse(new TextDecoder().decode(bytes));
+    return cfg.k === "test" ? cfg : DEMO;
+  } catch (e) { return DEMO; }
+}
+
+const cfg = readConfig();
+const tg = window.Telegram && window.Telegram.WebApp;
+const inTelegram = !!(tg && tg.platform && tg.platform !== "unknown");
+if (inTelegram) { document.documentElement.classList.add("tg"); tg.ready(); tg.expand(); }
+
+const $ = id => document.getElementById(id);
+const answers = [];
+let screen = "intro";
+
+$("title").textContent = cfg.t;
+$("logo").textContent = (cfg.t.match(/«(.)/) || [, cfg.t[0]])[1];
+$("q-count").textContent = cfg.q.length;
+document.title = cfg.t;
+const levelCode = band => band[2].split(" ")[0];
+$("levels").innerHTML = cfg.b.map(() => `<span class="lvl"></span>`).join("");
+[...$("levels").children].forEach((el, i) => { el.textContent = cfg.b[i][2]; });
+
+// Та же логика, что в leveltest.py: число верных ответов → диапазон уровня.
+function result() {
+  const score = cfg.q.reduce((s, q, i) => s + (answers[i] === q[2] ? 1 : 0), 0);
+  const band = cfg.b.find(b => b[0] <= score && score <= b[1]) || cfg.b[cfg.b.length - 1];
+  return { score, band };
+}
+
+function haptic(kind) {
+  if (!inTelegram || !tg.HapticFeedback) return;
+  if (kind) tg.HapticFeedback.notificationOccurred(kind); else tg.HapticFeedback.selectionChanged();
+}
+
+function show(name) {
+  screen = name;
+  ["intro", "quiz", "result", "form", "done"].forEach(n => { $("s-" + n).hidden = n !== name; });
+  if (inTelegram) {
+    if (name === "form") tg.BackButton.show(); else tg.BackButton.hide();
+  }
+  window.scrollTo(0, 0);
+  updateMainButton();
+}
+
+function renderQuestion() {
+  const i = answers.length;
+  const [text, options] = cfg.q[i];
+  // Уровень вопроса — по тому, в какую «полосу» попадает его номер.
+  const band = cfg.b.find(b => b[0] <= i + 1 && i + 1 <= b[1]) || cfg.b[cfg.b.length - 1];
+  $("q-num").textContent = `Вопрос ${i + 1} из ${cfg.q.length}`;
+  $("q-level").textContent = levelCode(band);
+  $("bar").style.width = `${(i / cfg.q.length) * 100}%`;
+  const parts = text.split("___");
+  $("question").innerHTML = "";
+  parts.forEach((p, k) => {
+    $("question").append(document.createTextNode(p));
+    if (k < parts.length - 1) { const g = document.createElement("span"); g.className = "gap"; $("question").append(g); }
+  });
+  $("opts").innerHTML = "";
+  options.forEach((label, j) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "opt"; b.textContent = label;
+    b.addEventListener("click", () => answer(j, b));
+    $("opts").append(b);
+  });
+}
+
+let locked = false;
+function answer(j, btn) {
+  if (locked) return;
+  locked = true;
+  if (btn) btn.classList.add("picked");
+  haptic();
+  setTimeout(() => {
+    answers.push(j);
+    locked = false;
+    if (answers.length < cfg.q.length) renderQuestion(); else finish();
+  }, btn ? 220 : 0);
+}
+
+function finish() {
+  const { score, band } = result();
+  haptic("success");
+  $("r-level").textContent = band[2];
+  $("r-score").textContent = `Верных ответов: ${score} из ${cfg.q.length}`;
+  $("r-advice").textContent = band[3];
+  $("f-result").textContent = `${band[2]} — ${score} из ${cfg.q.length}`;
+  $("r-scale").innerHTML = cfg.b.map(() => "<div></div>").join("");
+  [...$("r-scale").children].forEach((el, i) => {
+    el.textContent = levelCode(cfg.b[i]);
+    el.classList.toggle("on", cfg.b[i] === band);
+  });
+  $("review").innerHTML = "";
+  cfg.q.forEach(([text, options, correct], i) => {
+    const row = document.createElement("div");
+    const mark = document.createElement("span");
+    const ok = answers[i] === correct;
+    mark.className = ok ? "r-ok" : "r-bad"; mark.textContent = ok ? "✓" : "✗";
+    const t = document.createElement("span");
+    t.textContent = text.replace("___", options[correct]);
+    row.append(mark, t);
+    $("review").append(row);
+  });
+  show("result");
+}
+
+const MAIN_TEXT = { intro: "Начать тест", result: "Записаться на бесплатный пробный урок", form: "Отправить заявку" };
+
+function updateMainButton() {
+  const text = MAIN_TEXT[screen];
+  if (inTelegram) {
+    if (text) tg.MainButton.setParams({ text, is_visible: true }); else tg.MainButton.hide();
+  } else {
+    $("fallback-btn").hidden = !text;
+    $("fallback-btn").textContent = text || "";
+  }
+}
+
+function onMain() {
+  if (screen === "intro") { renderQuestion(); show("quiz"); return; }
+  if (screen === "result") { show("form"); return; }
+  if (screen !== "form") return;
+  const name = $("f-name").value.trim();
+  const phone = $("f-phone").value.trim();
+  const err = $("f-error");
+  if (!name || phone.replace(/\D/g, "").length < 10) { err.hidden = false; err.textContent = "Укажите имя и телефон — администратор позвонит, чтобы подобрать время урока."; return; }
+  if (!$("f-consent").checked) { err.hidden = false; err.textContent = "Отметьте согласие на обработку данных — без него мы не можем принять заявку."; return; }
+  err.hidden = true;
+  // Уровень бот пересчитает сам по ответам — подделать результат из приложения нельзя.
+  const when = [$("f-who").value, $("f-format").value, $("f-when").value].join(", ");
+  const data = JSON.stringify({ v: 1, k: "test", a: answers, name, phone, when });
+  if (inTelegram) { tg.sendData(data); return; }
+  console.log("Заявка (вне Telegram не отправляется):", data);
+  show("done");
+}
+
+$("skip").addEventListener("click", () => answer(SKIPPED, null));
+$("fallback-btn").addEventListener("click", onMain);
+if (inTelegram) {
+  tg.MainButton.onClick(onMain);
+  tg.BackButton.onClick(() => show("result"));
+}
+show("intro");
+</script>
+</body>
+</html>
